@@ -10,7 +10,7 @@ Double-click `VRC Height OSC.lnk` for the no-console icon launcher. It starts th
 dotnet run --project src/VrcHeightOsc.App/VrcHeightOsc.App.csproj --configuration Release
 ```
 
-The first run restores NuGet packages. Keep VRChat OSC enabled. The status bar shows the local OSC/OSCQuery ports and the currently discovered VRChat endpoint. A local `vrc_height_osc_config.json` is created automatically; `vrc_height_osc_config.example.json` is the safe public example.
+The first run restores NuGet packages. Keep VRChat OSC enabled. The status bar shows the local OSC/OSCQuery ports and the currently discovered VRChat endpoint. Settings are stored at `%LocalAppData%\Sophias OSC Scale Tool\vrc_height_osc_config.json`, so shortcut, VBS, and pinned-taskbar launches all use the same file. The first launch automatically migrates an existing project-root or old executable-folder config. `vrc_height_osc_config.example.json` is the safe public example.
 
 ## Reconnection behavior
 

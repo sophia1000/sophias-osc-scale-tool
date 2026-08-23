@@ -19,7 +19,7 @@ internal sealed class AppController : IAppController
 
     public AppController()
     {
-        _config = new JsonConfigStore(ResolveConfigPath());
+        _config = new JsonConfigStore(AppPaths.ResolveConfigPath());
         _network.MessageReceived += OnOscMessage;
         _network.RemoteValueReceived += OnRemoteValue;
         _network.StateChanged += OnNetworkState;
@@ -286,16 +286,6 @@ internal sealed class AppController : IAppController
     }
 
     private void NotifyStateChanged() => StateChanged?.Invoke();
-
-    private static string ResolveConfigPath()
-    {
-        var current = Path.Combine(Environment.CurrentDirectory, AppConstants.ConfigFile);
-        if (File.Exists(current))
-        {
-            return current;
-        }
-        return Path.Combine(AppContext.BaseDirectory, AppConstants.ConfigFile);
-    }
 
     public async ValueTask DisposeAsync()
     {

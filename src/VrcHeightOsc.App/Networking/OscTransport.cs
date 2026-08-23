@@ -1,5 +1,9 @@
 using BlobHandles;
 using BuildSoft.OscCore;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using System.Runtime.ExceptionServices;
 
 namespace VrcHeightOsc.App.Networking;
 
@@ -24,20 +28,72 @@ internal sealed class OscTransport : IDisposable
         _server.AddMonitorCallback(_monitor);
     }
 
-    public void SetTarget(string host, int port)
+    public string SetTarget(string host, int port)
     {
         lock (_clientGate)
         {
             var next = (host, port);
             if (_target == next && _client is not null)
             {
-                return;
+                return _client.Destination.Address.ToString();
             }
 
             _client?.Dispose();
-            _client = new OscClient(host, port);
+            _client = CreateClient(host, port);
             _target = next;
+            return _client.Destination.Address.ToString();
         }
+    }
+
+    private static OscClient CreateClient(string host, int port)
+    {
+        try
+        {
+            return new OscClient(host, port);
+        }
+        catch (SocketException original) when (
+            IPAddress.TryParse(host, out var address) && IPAddress.IsLoopback(address))
+        {
+            // Some Windows network stacks reject OscCore's connected loopback UDP
+            // socket when the process also owns multicast sockets. VRChat listens on
+            // every local IPv4 interface, so an active interface is a safe same-host
+            // fallback while still using OscCore for serialization and transport.
+            foreach (var localAddress in ActiveLocalIpv4Addresses())
+            {
+                try
+                {
+                    return new OscClient(localAddress.ToString(), port);
+                }
+                catch (SocketException)
+                {
+                    // Try the next active interface before surfacing the first error.
+                }
+            }
+
+            ExceptionDispatchInfo.Capture(original).Throw();
+            throw;
+        }
+    }
+
+    private static IEnumerable<IPAddress> ActiveLocalIpv4Addresses()
+    {
+        return NetworkInterface.GetAllNetworkInterfaces()
+            .Where(adapter => adapter.OperationalStatus == OperationalStatus.Up &&
+                              adapter.NetworkInterfaceType is not NetworkInterfaceType.Loopback)
+            .Select(adapter => new
+            {
+                HasGateway = adapter.GetIPProperties().GatewayAddresses.Any(gateway =>
+                    gateway.Address.AddressFamily == AddressFamily.InterNetwork &&
+                    !gateway.Address.Equals(IPAddress.Any)),
+                Addresses = adapter.GetIPProperties().UnicastAddresses
+                    .Select(unicast => unicast.Address)
+                    .Where(address => address.AddressFamily == AddressFamily.InterNetwork &&
+                                      !IPAddress.IsLoopback(address))
+                    .ToArray(),
+            })
+            .OrderByDescending(adapter => adapter.HasGateway)
+            .SelectMany(adapter => adapter.Addresses)
+            .Distinct();
     }
 
     public void ClearTarget()

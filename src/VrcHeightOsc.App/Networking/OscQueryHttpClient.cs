@@ -14,7 +14,7 @@ internal sealed class OscQueryHttpClient : IDisposable
 {
     private readonly HttpClient _http = new(new HttpClientHandler { UseProxy = false })
     {
-        Timeout = TimeSpan.FromSeconds(1.2),
+        Timeout = TimeSpan.FromSeconds(3),
     };
 
     private static readonly string[] RefreshPaths =

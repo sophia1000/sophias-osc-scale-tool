@@ -29,6 +29,7 @@ internal sealed class NetworkCoordinator : IAsyncDisposable
     private int _restartCount;
     private int _heartbeatFailures;
     private int _hardReconnectRequested;
+    private string? _lastCandidateDiagnostic;
     private string? _connectedServiceName;
     private IPAddress? _queryAddress;
     private int? _queryPort;
@@ -283,8 +284,14 @@ internal sealed class NetworkCoordinator : IAsyncDisposable
     {
         ExpireBadEndpoints();
         var attempted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pending = new List<Candidate>();
+        while (_candidates.TryDequeue(out var queuedCandidate))
+        {
+            pending.Add(queuedCandidate);
+        }
 
-        while (_candidates.TryDequeue(out var candidate))
+        foreach (var candidate in pending
+                     .OrderBy(item => item.Name.StartsWith("VRChat-log-", StringComparison.OrdinalIgnoreCase) ? 0 : 1))
         {
             if (_candidateFilter is not null && !_candidateFilter(candidate.Name))
             {
@@ -299,17 +306,22 @@ internal sealed class NetworkCoordinator : IAsyncDisposable
                     continue;
                 }
 
+                _lastCandidateDiagnostic = $"Trying VRChat OSCQuery candidate {key}.";
                 try
                 {
-                    if (!await _http.LooksLikeVrChatAsync(address, candidate.Port, candidate.Name, token))
-                    {
-                        continue;
-                    }
-
                     var host = await _http.GetHostInfoAsync(address, candidate.Port, token);
                     if (host is null)
                     {
                         MarkBad(key, TimeSpan.FromSeconds(5));
+                        _lastCandidateDiagnostic = $"OSCQuery candidate {key} returned no HOST_INFO.";
+                        continue;
+                    }
+
+                    var namedVrChat = candidate.Name.Contains("VRChat", StringComparison.OrdinalIgnoreCase) ||
+                                      (host.Name?.Contains("VRChat", StringComparison.OrdinalIgnoreCase) ?? false);
+                    if (!namedVrChat && !await _http.LooksLikeVrChatAsync(address, candidate.Port, candidate.Name, token))
+                    {
+                        _lastCandidateDiagnostic = $"OSCQuery candidate {key} was not identified as VRChat.";
                         continue;
                     }
 
@@ -322,24 +334,40 @@ internal sealed class NetworkCoordinator : IAsyncDisposable
                     }
 
                     UpdateOscTarget(host, address);
+                    _lastCandidateDiagnostic = null;
                     PublishState();
-                    await RefreshValuesAsync(token);
+                    try
+                    {
+                        await RefreshValuesAsync(token);
+                    }
+                    catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                    {
+                        SetStatus($"Connected to VRChat OSCQuery at {address}:{candidate.Port}; initial value refresh timed out.");
+                    }
+                    catch (Exception ex)
+                    {
+                        SetStatus($"Connected to VRChat OSCQuery at {address}:{candidate.Port}; initial value refresh deferred ({ex.GetType().Name}).");
+                    }
                     return;
                 }
                 catch (OperationCanceledException) when (!token.IsCancellationRequested)
                 {
                     MarkBad(key, TimeSpan.FromSeconds(3));
-                    Disconnect("Candidate timed out; continuing discovery.", quarantine: false);
+                    _lastCandidateDiagnostic = $"OSCQuery candidate {key} timed out; continuing discovery.";
+                    Disconnect(_lastCandidateDiagnostic, quarantine: false);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     MarkBad(key, TimeSpan.FromSeconds(5));
-                    Disconnect("Candidate failed during connection; continuing discovery.", quarantine: false);
+                    _lastCandidateDiagnostic = $"OSCQuery candidate {key} failed ({ex.GetType().Name}: {ex.Message}); continuing discovery.";
+                    Disconnect(_lastCandidateDiagnostic, quarantine: false);
                 }
             }
         }
 
-        SetStatus("Searching for VRChat OSCQuery...");
+        SetStatus(attempted.Count == 0
+            ? _lastCandidateDiagnostic ?? "Searching for VRChat OSCQuery..."
+            : _lastCandidateDiagnostic ?? $"No VRChat OSCQuery candidate validated. Tried {string.Join(", ", attempted)}.");
     }
 
     private void UpdateOscTarget(RemoteHostInfo host, IPAddress queryAddress)
@@ -351,7 +379,7 @@ internal sealed class NetworkCoordinator : IAsyncDisposable
 
         lock (_transportGate)
         {
-            _osc.SetTarget(targetHost!, targetPort);
+            targetHost = _osc.SetTarget(targetHost!, targetPort);
         }
         lock (_stateGate)
         {
@@ -428,17 +456,28 @@ internal sealed class NetworkCoordinator : IAsyncDisposable
 
     private void Enqueue(OSCQueryServiceProfile profile)
     {
-        if (profile.name.Contains(AppConstants.Name, StringComparison.OrdinalIgnoreCase))
+        if (profile is null || profile.address is null || profile.port is < 1 or > 65535)
         {
             return;
         }
 
-        if (_candidateFilter is not null && !_candidateFilter(profile.name))
+        var serviceName = profile.name ?? string.Empty;
+        if (serviceName.Contains(AppConstants.Name, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        _candidates.Enqueue(new Candidate(profile.name, profile.address, profile.port));
+        if (!serviceName.Contains("VRChat", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (_candidateFilter is not null && !_candidateFilter(serviceName))
+        {
+            return;
+        }
+
+        _candidates.Enqueue(new Candidate(serviceName, profile.address, profile.port));
     }
 
     private void Disconnect(string reason, bool quarantine)
@@ -525,26 +564,28 @@ internal sealed class NetworkCoordinator : IAsyncDisposable
         var seen = new HashSet<int>();
         foreach (var file in Directory.EnumerateFiles(logDirectory, "output_log*.*")
                      .OrderByDescending(File.GetLastWriteTimeUtc)
-                     .Take(5))
+                     .Take(1))
         {
-            string tail;
+            string startupSection;
             try
             {
                 using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                stream.Seek(Math.Max(0, stream.Length - 700_000), SeekOrigin.Begin);
                 using var reader = new StreamReader(stream);
-                tail = reader.ReadToEnd();
+                var buffer = new char[700_000];
+                var count = reader.ReadBlock(buffer, 0, buffer.Length);
+                startupSection = new string(buffer, 0, count);
             }
             catch
             {
                 continue;
             }
 
-            foreach (Match match in pattern.Matches(tail))
+            foreach (Match match in pattern.Matches(startupSection).Cast<Match>().Reverse())
             {
                 if (int.TryParse(match.Groups[1].Value, out var port) && port is >= 1024 and <= 65535 && seen.Add(port))
                 {
                     yield return port;
+                    yield break;
                 }
             }
         }
