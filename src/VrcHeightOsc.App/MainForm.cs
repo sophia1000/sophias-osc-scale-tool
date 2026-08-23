@@ -708,10 +708,10 @@ internal sealed class MainForm : Form
 
     private static SurfacePanel MetricCard(string title, Label value, Color accent, Padding margin)
     {
-        var card = new SurfacePanel { Dock = DockStyle.Fill, BackColor = DarkTheme.SurfaceRaised, BorderColor = DarkTheme.Border, Padding = new Padding(13, 10, 13, 9), Margin = margin, CornerRadius = 11 };
+        var card = new SurfacePanel { Dock = DockStyle.Fill, BackColor = DarkTheme.SurfaceRaised, BorderColor = DarkTheme.Border, Padding = new Padding(13, 8, 13, 10), Margin = margin, CornerRadius = 11 };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 2, BackColor = Color.Transparent, Margin = Padding.Empty };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 19));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 40));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 7));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var marker = new Panel { BackColor = accent, Dock = DockStyle.Fill, Margin = new Padding(0, 3, 4, 3) };
@@ -720,7 +720,6 @@ internal sealed class MainForm : Form
         titleLabel.Anchor = AnchorStyles.Left;
         layout.Controls.Add(titleLabel, 1, 0);
         value.Dock = DockStyle.Fill;
-        value.Anchor = AnchorStyles.Left;
         layout.Controls.Add(value, 0, 1);
         layout.SetColumnSpan(value, 2);
         card.Controls.Add(layout);
@@ -731,10 +730,11 @@ internal sealed class MainForm : Form
     {
         Text = "--",
         AutoSize = false,
-        Font = new Font("Segoe UI Semibold", 17F, FontStyle.Bold),
+        Font = new Font("Segoe UI Semibold", 16F, FontStyle.Bold),
         ForeColor = DarkTheme.Text,
         BackColor = Color.Transparent,
         TextAlign = ContentAlignment.MiddleLeft,
+        Padding = new Padding(0, 1, 0, 4),
         Margin = Padding.Empty,
     };
 

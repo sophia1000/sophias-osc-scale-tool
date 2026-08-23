@@ -48,7 +48,7 @@ internal static class DarkTheme
 
     public static ComboBox ComboBox(params string[] values)
     {
-        var combo = new ComboBox
+        var combo = new DarkComboBox
         {
             DropDownStyle = ComboBoxStyle.DropDownList,
             FlatStyle = FlatStyle.Flat,
@@ -62,13 +62,19 @@ internal static class DarkTheme
         combo.Items.AddRange(values);
         combo.DrawItem += (_, e) =>
         {
-            e.DrawBackground();
-            using var brush = new SolidBrush(Text);
             if (e.Index >= 0)
             {
-                e.Graphics.DrawString(combo.Items[e.Index]?.ToString(), combo.Font, brush, e.Bounds.X + 7, e.Bounds.Y + 4);
+                var selected = (e.State & DrawItemState.Selected) != 0;
+                using var background = new SolidBrush(selected ? SurfaceHover : SurfaceRaised);
+                e.Graphics.FillRectangle(background, e.Bounds);
+                TextRenderer.DrawText(
+                    e.Graphics,
+                    combo.Items[e.Index]?.ToString(),
+                    combo.Font,
+                    Rectangle.Inflate(e.Bounds, -7, 0),
+                    Text,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             }
-            e.DrawFocusRectangle();
         };
         return combo;
     }
@@ -114,6 +120,9 @@ internal static class DarkTheme
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int valueSize);
+
+    [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
+    internal static extern int SetWindowTheme(IntPtr window, string? appName, string? idList);
 }
 
 internal enum ButtonTone
@@ -121,6 +130,50 @@ internal enum ButtonTone
     Secondary,
     Primary,
     Danger,
+}
+
+internal sealed class DarkComboBox : ComboBox
+{
+    private const int WmPaint = 0x000F;
+
+    protected override void OnHandleCreated(EventArgs eventargs)
+    {
+        base.OnHandleCreated(eventargs);
+        DarkTheme.SetWindowTheme(Handle, "DarkMode_Explorer", null);
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        base.WndProc(ref message);
+        if (message.Msg == WmPaint && IsHandleCreated && Width > 0 && Height > 0)
+        {
+            using var graphics = CreateGraphics();
+            DrawDarkChrome(graphics);
+        }
+    }
+
+    private void DrawDarkChrome(Graphics graphics)
+    {
+        var border = Focused ? DarkTheme.AccentDeep : DarkTheme.Border;
+        var buttonWidth = Math.Min(29, Math.Max(22, Height));
+        var button = new Rectangle(Width - buttonWidth - 1, 1, buttonWidth, Height - 2);
+
+        using var buttonBrush = new SolidBrush(DarkTheme.SurfaceRaised);
+        using var borderPen = new Pen(border);
+        using var arrowBrush = new SolidBrush(DarkTheme.Muted);
+        graphics.FillRectangle(buttonBrush, button);
+        graphics.DrawRectangle(borderPen, 0, 0, Width - 1, Height - 1);
+
+        var centerX = button.Left + button.Width / 2;
+        var centerY = button.Top + button.Height / 2 + 1;
+        var arrow = new[]
+        {
+            new Point(centerX - 5, centerY - 2),
+            new Point(centerX + 5, centerY - 2),
+            new Point(centerX, centerY + 4),
+        };
+        graphics.FillPolygon(arrowBrush, arrow);
+    }
 }
 
 internal sealed class SurfacePanel : Panel
