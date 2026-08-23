@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.agents/
+.vs/
+*.user
+*.tmp
+*.log
+__pycache__/
+old python version/root __pycache__/
+*.pyc
+*.lnk
+vrc_height_osc_config.json
+height_rules.json

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\VrcHeightOsc.Core\VrcHeightOsc.Core.csproj" />
+    <PackageReference Include="BuildSoft.OscCore" Version="1.2.1.1" />
+    <PackageReference Include="VRChat.OSCQuery" Version="0.0.7" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <!-- Link the internal networking units directly so low-level loopback and
+       reconnect tests do not need to expose the app's implementation types. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\VrcHeightOsc.App\AppConstants.cs" Link="App\AppConstants.cs" />
+    <Compile Include="..\..\src\VrcHeightOsc.App\Networking\OscMessage.cs" Link="App\Networking\OscMessage.cs" />
+    <Compile Include="..\..\src\VrcHeightOsc.App\Networking\NetworkCoordinator.cs" Link="App\Networking\NetworkCoordinator.cs" />
+    <Compile Include="..\..\src\VrcHeightOsc.App\Networking\NetworkStateSnapshot.cs" Link="App\Networking\NetworkStateSnapshot.cs" />
+    <Compile Include="..\..\src\VrcHeightOsc.App\Networking\OscQueryHttpClient.cs" Link="App\Networking\OscQueryHttpClient.cs" />
+    <Compile Include="..\..\src\VrcHeightOsc.App\Networking\OscTransport.cs" Link="App\Networking\OscTransport.cs" />
+  </ItemGroup>
+
+</Project>

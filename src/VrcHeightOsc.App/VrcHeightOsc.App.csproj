@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\vrc-height-osc-icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VrcHeightOsc.Core\VrcHeightOsc.Core.csproj" />
+    <PackageReference Include="BuildSoft.OscCore" Version="1.2.1.1" />
+    <PackageReference Include="VRChat.OSCQuery" Version="0.0.7" />
+    <None Include="..\..\assets\vrc-height-osc-icon.ico" Link="vrc-height-osc-icon.ico" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "ui": {
+    "geometry": "1240x860",
+    "height_value": 1.6,
+    "smooth_enabled": false,
+    "smooth_time": "0.35"
+  },
+  "rules": []
+}
